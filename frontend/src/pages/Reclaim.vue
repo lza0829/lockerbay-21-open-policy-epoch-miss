@@ -5,13 +5,12 @@ import { api } from '../api.js'
 const rows = ref([])
 const proofs = ref([])
 const q = ref([])
+const generations = ref([])
 const currentHours = ref(null)
 const loadedAt = ref('')
 
-const drift = computed(() => {
-  if (currentHours.value === null) return []
-  return proofs.value.filter((p) => p.overdue_hours_used !== null && p.overdue_hours_used !== currentHours.value)
-})
+const drift = computed(() => proofs.value.filter((p) => p.epoch_drift))
+const missingEpoch = computed(() => proofs.value.filter((p) => !p.epoch_pinned))
 
 async function load() {
   rows.value = await api.occupancies()
@@ -19,6 +18,7 @@ async function load() {
   const body = await api.deadlines()
   proofs.value = body.rows
   currentHours.value = body.current_overdue_hours
+  generations.value = (await api.generations()).generations
   loadedAt.value = new Date().toLocaleTimeString()
 }
 onMounted(load)
@@ -29,24 +29,24 @@ onMounted(load)
   <div>
     <h1>回收</h1>
     <p class="sub">
-      deadline 在开占用时物化落库，此处只读；柜规变更只影响之后新开的占用。
+      deadline 与柜规世代（policy_epoch）在开占用时同笔物化落库，此处只读；柜规变更只影响之后新开的占用。
     </p>
 
     <div class="stats">
       <div class="stat"><b>{{ proofs.length }}</b><span>核对行</span></div>
-      <div class="stat"><b>{{ proofs.filter((p) => p.deadline_missing).length }}</b><span>缺 deadline</span></div>
+      <div class="stat"><b>{{ missingEpoch.length }}</b><span>缺 epoch</span></div>
       <div class="stat"><b>{{ currentHours ?? '—' }}</b><span>现行 overdue_hours</span></div>
-      <div class="stat"><b>{{ drift.length }}</b><span>按旧规落地</span></div>
+      <div class="stat"><b>{{ drift.length }}</b><span>按旧世代落地</span></div>
     </div>
 
     <div class="panel">
-      <h2 style="margin:0 0 .5rem;font-size:1rem">deadline 核对（占用 · 开启 · 截止 · 所用小时）</h2>
+      <h2 style="margin:0 0 .5rem;font-size:1rem">deadline 核对（占用 · 开启 · 截止 · 所用小时 · 柜规世代）</h2>
       <p class="sub">
         只读接口 <code>GET /api/reclaim/deadlines</code>；读取于 {{ loadedAt }}。
-        有 {{ drift.length }} 笔占用按旧柜规落地，截止时刻保持原值、不随柜规重算。
+        有 {{ drift.length }} 笔占用按旧柜规世代落地，截止时刻保持原值、不随柜规重算。
       </p>
       <table>
-        <thead><tr><th>占用</th><th>格口</th><th>运单</th><th>开启</th><th>截止</th><th>所用小时</th><th>状态</th></tr></thead>
+        <thead><tr><th>占用</th><th>格口</th><th>运单</th><th>开启</th><th>截止</th><th>所用小时</th><th>世代</th><th>状态</th></tr></thead>
         <tbody>
           <tr v-for="p in proofs" :key="p.occupancy_id">
             <td><code>{{ p.occupancy_id }}</code></td>
@@ -55,7 +55,22 @@ onMounted(load)
             <td>{{ p.opened_at }}</td>
             <td><code>{{ p.reclaim_deadline_at || '缺列' }}</code></td>
             <td>{{ p.overdue_hours_used ?? '—' }}</td>
+            <td><code>{{ p.policy_epoch ?? '缺' }}</code></td>
             <td>{{ p.status }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="panel" style="margin-top:1rem">
+      <h2 style="margin:0 0 .5rem;font-size:1rem">柜规世代登记（append-only）</h2>
+      <table>
+        <thead><tr><th>世代</th><th>overdue_hours</th><th>登记于</th></tr></thead>
+        <tbody>
+          <tr v-for="g in generations" :key="g.policy_epoch">
+            <td><code>{{ g.policy_epoch }}</code></td>
+            <td>{{ g.overdue_hours }}</td>
+            <td>{{ g.created_at }}</td>
           </tr>
         </tbody>
       </table>

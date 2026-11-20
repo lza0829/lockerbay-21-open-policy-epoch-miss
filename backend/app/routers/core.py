@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Body, HTTPException
 
 from app.db import connect
+from app.modules import open_policy_epoch as epoch_svc
 from app.modules import reclaim_deadline_materialize as deadline_mod
 from app.seed import overdue_hours
 from app.services import bay as bay_svc
@@ -148,19 +149,51 @@ def put_overdue(body: dict = Body(...)):
             "INSERT OR REPLACE INTO settings(key, value) VALUES ('overdue_hours', ?)",
             (str(hours),),
         )
+        # 柜规热更新在与改柜规同一事务内登记世代；旧占用锁定原世代不受影响。
+        generation = epoch_svc.current_generation(conn)
         conn.commit()
-        return {"overdue_hours": hours}
+        return {"overdue_hours": hours, "policy_epoch": generation["policy_epoch"]}
     finally:
         conn.close()
 
 # --- plant routes ---
-from app.modules import open_policy_epoch as epoch_svc
+@router.get("/policy-epochs")
+def policy_epoch_proofs(status: str | None = None):
+    """epoch 核证只读列表：每笔占用自带的开账世代与一致性判定。
+
+    只读占用行的 ``policy_epoch``；``live_*`` 仅作现行柜规对照，不参与回放。
+    """
+    conn = connect()
+    try:
+        return {
+            "rows": epoch_svc.epoch_proofs(conn, status=status),
+            "generations": epoch_svc.generations(conn),
+        }
+    finally:
+        conn.close()
+
+
+@router.get("/policy-epochs/generations")
+def policy_epoch_generations():
+    """柜规世代登记（append-only 只读档案）；只读，不追加。"""
+    conn = connect()
+    try:
+        return {
+            "live": epoch_svc.live_generation(conn),
+            "generations": epoch_svc.generations(conn),
+        }
+    finally:
+        conn.close()
+
 
 @router.get("/policy-epoch/{occupancy_id}")
 def policy_epoch(occupancy_id: str):
     conn = connect()
     try:
-        return epoch_svc.epoch_for(conn, occupancy_id)
+        proof = epoch_svc.epoch_for(conn, occupancy_id)
+        if proof is None:
+            raise HTTPException(404, "占用不存在")
+        return proof
     finally:
         conn.close()
 

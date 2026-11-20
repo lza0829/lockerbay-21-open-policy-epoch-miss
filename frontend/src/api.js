@@ -22,5 +22,8 @@ export const api = {
   setOverdue: (overdue_hours) =>
     req('/api/settings/overdue-hours', { method: 'PUT', body: JSON.stringify({ overdue_hours }) }),
   ingest: () => req('/api/ingest/run', { method: 'POST', body: '{}' }),
-  policyEpoch: (id) => req(`/api/policy-epoch/${id}`),
+  policyEpoch: (id) => req(`/api/policy-epoch/${encodeURIComponent(id)}`),
+  epochs: (status) =>
+    req(`/api/policy-epochs${status ? `?status=${encodeURIComponent(status)}` : ''}`),
+  generations: () => req('/api/policy-epochs/generations'),
 }

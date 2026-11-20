@@ -25,8 +25,11 @@ def cabinet_matrix(conn):
         ]
         for cell in cells:
             occ = conn.execute(
-                "SELECT id, tracking_no, opened_at, reclaim_deadline_at, status "
-                "FROM occupancies WHERE cell_id=? ORDER BY opened_at DESC LIMIT 1",
+                "SELECT o.id, o.tracking_no, o.opened_at, o.reclaim_deadline_at, "
+                "o.policy_epoch, e.overdue_hours AS epoch_overdue_hours, o.status "
+                "FROM occupancies o "
+                "LEFT JOIN cabinet_policy_epochs e ON e.epoch = o.policy_epoch "
+                "WHERE o.cell_id=? ORDER BY o.opened_at DESC LIMIT 1",
                 (cell["id"],),
             ).fetchone()
             cell["occupancy"] = dict(occ) if occ else None

@@ -32,6 +32,10 @@ onMounted(async () => {
           <div class="meta" v-if="cell.status === 'occupied' && cell.occupancy?.reclaim_deadline_at">
             截止 {{ cell.occupancy.reclaim_deadline_at }}
           </div>
+          <div class="meta" v-if="cell.status === 'occupied' && cell.occupancy">
+            世代 <code>{{ cell.occupancy.policy_epoch ?? '缺' }}</code>
+            <template v-if="cell.occupancy.epoch_overdue_hours">· {{ cell.occupancy.epoch_overdue_hours }}h</template>
+          </div>
           <span class="dot" />
         </div>
       </div>

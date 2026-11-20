@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS occupancies (
   opened_at TEXT NOT NULL,
   reclaim_deadline_at TEXT,
   overdue_hours_used INTEGER,
+  policy_epoch INTEGER,
   closed_at TEXT,
   status TEXT NOT NULL DEFAULT 'occupied',
   last_event_id TEXT

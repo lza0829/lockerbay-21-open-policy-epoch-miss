@@ -11,3 +11,20 @@ os.environ.setdefault(
 )
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+import pytest
+
+from app import db as db_mod
+from app import seed as seed_mod
+
+
+@pytest.fixture()
+def fresh_db(tmp_path, monkeypatch):
+    """每个用例一份干净 SQLite 库（本地夹具，不触网）。"""
+    monkeypatch.setattr(db_mod, "DB_PATH", tmp_path / "lockerbay.db")
+    seed_mod.init_db()
+    conn = db_mod.connect()
+    try:
+        yield conn
+    finally:
+        conn.close()

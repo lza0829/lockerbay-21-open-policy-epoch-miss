@@ -4,21 +4,8 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from app import db as db_mod
-from app import seed as seed_mod
 from app.modules import reclaim_deadline_materialize as deadline_mod
 from app.services import ingest as ingest_svc
-
-
-@pytest.fixture()
-def fresh_db(tmp_path, monkeypatch):
-    """每个用例一份干净 SQLite 库（本地夹具，不触网）。"""
-    monkeypatch.setattr(db_mod, "DB_PATH", tmp_path / "lockerbay.db")
-    seed_mod.init_db()
-    conn = db_mod.connect()
-    try:
-        yield conn
-    finally:
-        conn.close()
 
 
 def _add_cell(conn, cell_id="CAB-A-04"):
